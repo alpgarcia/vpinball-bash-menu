@@ -49,23 +49,33 @@ parse_args() {
 }
 
 select_file() {
-    
-    local string="@(${files[0]}"
-    ## Add the rest of the files to the string
-    for((i=1;i<${#files[@]};i++))
+
+    for((i=0;i<${#files[@]};i++))
     do
-        string+="|${files[$i]}"
+        ## Remove common path (get rid of trailing slashes, if any)
+        files[$i]="${files[$i]#"$common_path"/*}"
     done
-    ## Close the parenthesis. $string is now @(file1|file2|...|fileN)
-    string+=")"
+
+    local valid_opts=""
+    ## Add the files to the valid_opts string
+    for((i=0;i<${#files[@]};i++))
+    do
+        ## Remove common path and add the rest to the list
+        valid_opts+="${files[$i]}|"
+    done
+
+    ## Substitute last | by the closing parenthesis. 
+    ## $valid_opts is now @(file1|file2|...|fileN) with paths relative
+    ## to TBLS_DIR
+    valid_opts="@(${valid_opts%|})"
 
     ## Show the menu. This will list all files
     select file in "${files[@]}"
     do
         case $file in
         
-        ## If the choice is one of the files (if it matches $string)
-        $string)
+        ## If the choice is one of the files (if it matches $valid_opts)
+        $valid_opts)
             ## Do something here
             echo "$file"
             break;
@@ -80,11 +90,13 @@ select_file() {
 
 select_vpx() {
     local files=( ${TBLS_DIR}/**/*.vpx )
+    local common_path=${TBLS_DIR}
     echo $(select_file)
 }
 
 select_ini() {
     local files=( ${INI_DIR}/**/*.ini )
+    local common_path=${INI_DIR}
     echo $(select_file)
 }
 
@@ -113,8 +125,10 @@ do
 
     echo -e "\nTABLE: ${vpx}"
     echo -e "\nINI: ${ini}\n"
-            
-    ${VPINBALL} -ini "${ini}" -play "${vpx}"
+
+    echo -e "LAUNCHING...\n"
+    (set -x; "${VPINBALL}" -ini "${INI_DIR}/${ini}" -play "${TBLS_DIR}/${vpx}")
+    
 
     echo -e "\n GAME END\n"
 done
