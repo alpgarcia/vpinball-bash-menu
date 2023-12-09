@@ -8,6 +8,10 @@ CHUNK_SIZE=20
 ## Text formatting
 BOLD=$(tput bold)
 NORMAL=$(tput sgr0)
+GREY=$(tput setaf 8)
+GREEN=$(tput setaf 2)
+OLIVE=$(tput setaf 3)
+BLUE=$(tput setaf 4)
 
 
 help()
@@ -56,6 +60,24 @@ parse_args() {
     done
 }
 
+sidecar_info() {
+    if [[ -f "${chunk[$i]%.vpx}.ini" ]]; then
+        side+="${BOLD}${GREEN}i${NORMAL}${GREY}·"
+    else
+        side+="${GREY}i${GREY}·"
+    fi
+    if [[ -f "${chunk[$i]%.vpx}.directb2s" ]]; then
+        side+="${BOLD}${OLIVE}b${NORMAL}${GREY}·"
+    else
+        side+="${GREY}b${GREY}·"
+    fi
+    if [[ -f "${chunk[$i]%.vpx}.vbs" ]]; then
+        side+="${BOLD}${BLUE}v${NORMAL}"
+    else
+        side+="${GREY}v${NORMAL}"
+    fi
+}
+
 select_file() {
 
     local num_files=${#files[@]}
@@ -84,12 +106,20 @@ select_file() {
         # number and the file name
         for((i=0;i<${#chunk[@]};i++))
         do
-            ## Remove common path (get rid of trailing slashes, if any)
+            # Look for sidecar files if vpx extension
+            local side=""
+            if [[ ${chunk[$i]} == *.vpx ]]; then
+                side="["
+                sidecar_info
+                side+="] "
+            fi
+            
+            # Remove common path (get rid of trailing slashes, if any)
             chunk[$i]="${chunk[$i]#"$common_path"/*}"
 
             # Print the order number (formatted to the lenght of the number
             # of files) and the file name.
-            printf "[%${#num_files}d] %s\n" "$((i+1))" "${chunk[$i]}" >&2
+            printf "[%${#num_files}d] %s%s\n" "$((i+1))" "${side}" "${chunk[$i]}" >&2
 
         done
 
