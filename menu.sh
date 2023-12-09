@@ -118,8 +118,8 @@ select_file() {
             chunk[$i]="${chunk[$i]#"$common_path"/*}"
 
             # Print the order number (formatted to the lenght of the number
-            # of files) and the file name.
-            printf "[%${#num_files}d] %s%s\n" "$((i+1))" "${side}" "${chunk[$i]}" >&2
+            # of files) and the file path (common path removed) without extension.
+            printf "[%${#num_files}d] %s%s\n" "$((i+1))" "${side}" "${chunk[$i]%.*}" >&2
 
         done
 
