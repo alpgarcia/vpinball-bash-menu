@@ -3,16 +3,20 @@
 TBLS_DIR="${HOME}/pinball/tables"
 INI_DIR="${HOME}/pinball/ini"
 VPINBALL="${HOME}/pinball/vpinball/build/VPinballX_GL"
+CHUNK_SIZE=20
 
-# TODO - add pagination
-# TODO - add default values to the help message
+## Text formatting
+BOLD=$(tput bold)
+NORMAL=$(tput sgr0)
+
 
 help()
 {
-    echo "Usage: ./menu.sh [ -t | --tables ]
-                 [ -i | --ini ]
-                 [ -e | --exe ]
-                 [ -h | --help ]"
+    printf "Usage: ./menu.sh [ -t | --tables <TABLES_ROOT_DIR>] (default: ${TBLS_DIR})\n"
+    printf "\t\t [ -i | --ini <INI_FILES_ROOT_DIR>] (default: ${INI_DIR})\n"
+    printf "\t\t [ -e | --exe <VPINBALL_BINARY_PATH>] (default: ${VPINBALL})\n"
+    printf "\t\t [ -p | --page-size <NUMBER_OF_ITEMS_PER_PAGE>] (default: ${CHUNK_SIZE})\n"
+    printf "\t\t [ -h | --help ]\n"
     exit 2
 }
 
@@ -34,6 +38,10 @@ parse_args() {
                 INI_DIR="$2"
                 shift 2 # past argument and value
                 ;;
+            -p | --page-size)
+                CHUNK_SIZE="$2"
+                shift 2 # past argument and value
+                ;;
             -e|--exe)
                 VPINBALL="$2"
                 shift 2 # past argument and value
@@ -50,54 +58,82 @@ parse_args() {
 
 select_file() {
 
-    for((i=0;i<${#files[@]};i++))
-    do
-        ## Remove common path (get rid of trailing slashes, if any)
-        files[$i]="${files[$i]#"$common_path"/*}"
-    done
+    local num_files=${#files[@]}
 
-    local valid_opts=""
-    ## Add the files to the valid_opts string
-    for((i=0;i<${#files[@]};i++))
+    ## Show the menu. This will list current chunk
+    # Limit the number of columns to 1
+    COLUMNS=1
+    local selected=false
+    until ${selected};
     do
-        ## Remove common path and add the rest to the list
-        valid_opts+="${files[$i]}|"
-    done
+        # Clear the screen preserving the scrollback buffer
+        clear -x
 
-    ## Substitute last | by the closing parenthesis. 
-    ## $valid_opts is now @(file1|file2|...|fileN) with paths relative
-    ## to TBLS_DIR
-    valid_opts="@(${valid_opts%|})"
+        # Get files to display
+        chunk=("${files[@]:INDEX:CHUNK_SIZE}")
 
-    ## Show the menu. This will list all files
-    select file in "${files[@]}"
-    do
-        case $file in
+        # Print header with pagination info
+        local pos=$((INDEX+1))
+        local end=$((INDEX+${#chunk[@]}))
+        printf "${BOLD}\n-----\n" >&2
+        printf "${title} ${pos} - ${end} of ${num_files}\n" >&2
+        printf "${NORMAL}n - Next page, p - Previous page, Ctrl+C - Exit\n" >&2
+        printf "${BOLD}%s\n\n${NORMAL}" "-----" >&2
+
+        # Print the options: for each file in the chunk, print the order
+        # number and the file name
+        for((i=0;i<${#chunk[@]};i++))
+        do
+            ## Remove common path (get rid of trailing slashes, if any)
+            chunk[$i]="${chunk[$i]#"$common_path"/*}"
+
+            # Print the order number (formatted to the lenght of the number
+            # of files) and the file name.
+            printf "[%${#num_files}d] %s\n" "$((i+1))" "${chunk[$i]}" >&2
+
+        done
+
+        printf "\n ${BOLD}%s${NORMAL}" "${PS3-#? }" >&2
+        read -r
+
+        # If the user types 'n', go to the next page
+        if [[ $REPLY = n ]]; then
+            if [[ $((INDEX+CHUNK_SIZE)) -le ${num_files} ]]; then
+               INDEX=$((INDEX+CHUNK_SIZE))    
+            fi
+
+        # If the user types 'p', go to the previous page
+        elif [[ $REPLY = p ]]; then
+            if [[ $((INDEX-CHUNK_SIZE)) -ge 0 ]]; then
+                INDEX=$((INDEX-CHUNK_SIZE))
+            fi
         
-        ## If the choice is one of the files (if it matches $valid_opts)
-        $valid_opts)
-            ## Do something here
-            echo "$file"
-            break;
-            ;;
-        
-        *)
-            echo >&2 "Please choose a number from 1 to $((${#files[@]}+1))"       
-            ;;
-        esac
+        elif [[ $REPLY -ge 1 && $REPLY -le $end ]]; then
+            FILE_PATH=${chunk[$((REPLY-1))]}
+            selected=true
+
+        fi
+
     done
+
 }
 
 select_vpx() {
+    PS3="Select a table to play: "
+
+    local title="TABLES"
     local files=( ${TBLS_DIR}/**/*.vpx )
     local common_path=${TBLS_DIR}
-    echo $(select_file)
+    select_file
 }
 
 select_ini() {
+    PS3="Select an ini file to use: "
+
+    local title="TABLE: ${VPX}\nINI FILES "
     local files=( ${INI_DIR}/**/*.ini )
     local common_path=${INI_DIR}
-    echo $(select_file)
+    select_file
 }
 
 
@@ -116,23 +152,36 @@ shopt -s globstar
 
 parse_args "$@"
 
+INDEX=0
+TABLE_INDEX=0
+INI_INDEX=0
 while true
 do
-    vpx=$(select_vpx)
-    echo -e "\nTABLE: ${vpx}\n"
-        
-    ini=$(select_ini)
-
-    echo -e "\nTABLE: ${vpx}"
-    echo -e "\nINI: ${ini}\n"
-
-    echo -e "LAUNCHING...\n"
-    (set -x; "${VPINBALL}" -ini "${INI_DIR}/${ini}" -play "${TBLS_DIR}/${vpx}")
+    INDEX=${TABLE_INDEX}
+    select_vpx
+    VPX=$FILE_PATH
+    TABLE_INDEX=${INDEX}
     
+    INDEX=${INI_INDEX}
+    select_ini
+    INI=$FILE_PATH
+    INI_INDEX=${INDEX}
 
-    echo -e "\n GAME END\n"
+    printf "\n-----\n" >&2
+    printf "TABLE: ${VPX}\n" >&2
+    printf "INI: ${INI}\n" >&2
+    printf "%s\n" "-----" >&2
+
+    printf "LAUNCHING...\n" >&2
+    (set -x; "${VPINBALL}" -ini "${INI_DIR}/${INI}" -play "${TBLS_DIR}/${VPX}" >&2)
+    
+    printf "\n-----" >&2
+    printf "GAME END\n" >&2
+    printf "%s\n" "-----" >&2
 done
 
 shopt -u extglob
 shopt -u nullglob
 shopt -u globstar
+
+unset PS3
