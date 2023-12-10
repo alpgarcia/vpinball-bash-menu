@@ -53,10 +53,10 @@ There are some good alternatives focused on different aspects and functionalitie
  ## Usage
 ```
 ./menu.sh [ -t | --tables <TABLES_ROOT_DIR>] (default: $HOME/pinball/tables)
-		  [ -i | --ini <INI_FILES_ROOT_DIR>] (default: $HOME/pinball/ini)
-	  	  [ -e | --exe <VPINBALL_BINARY_PATH>] (default: $HOME/pinball/vpinball/build/VPinballX_GL)
-		  [ -p | --page-size <NUMBER_OF_ITEMS_PER_PAGE>] (default: 20)
-		  [ -h | --help ]
+	  [ -i | --ini <INI_FILES_ROOT_DIR>] (default: $HOME/pinball/ini)
+	  [ -e | --exe <VPINBALL_BINARY_PATH>] (default: $HOME/pinball/vpinball/build/VPinballX_GL)
+	  [ -p | --page-size <NUMBER_OF_ITEMS_PER_PAGE>] (default: 20)
+	  [ -h | --help ]
 
 ```
 * `-t | --tables`: path to our collection of vpx files. It may contain sub-directories. Defaults to `${HOME}/pinball/tables`.
